@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man Arcade Professional JS</title>
+    <style>
+        /* 1. ESTILIZAÇÃO PROFISSIONAL DO AMBIENTE (arcade feel) */
+        @import url('https://fonts.googleapis.com/css2?family=Bungee&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle, #1a1a2e 0%, #0c0c16 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Bungee', cursive; /* Fonte com estilo Arcade */
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 3rem;
+            color: yellow;
+            text-shadow: 0 0 10px rgba(255, 255, 0, 0.7), 0 0 20px rgba(255, 255, 0, 0.5);
+        }
+
+        #scoreBoard {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #fff;
+            text-shadow: 0 0 5px #fff, 0 0 10px #fff;
+            display: flex;
+            gap: 20px;
+        }
+        
+        #scoreBoard span {
+            color: #4df;
+            text-shadow: 0 0 5px #4df, 0 0 10px #4df;
+        }
+
+        /* 2. ESTILIZAÇÃO DO CANVAS (neon border) */
+        canvas {
+            background-color: #000;
+            border: 10px solid #1919A6;
+            border-radius: 20px;
+            /* Brilho neon azul na borda */
+            box-shadow: 0 0 25px rgba(25, 25, 166, 0.9), 0 0 50px rgba(25, 25, 166, 0.6), inset 0 0 15px rgba(25, 25, 166, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PAC-MAN JS</h1>
+    <div id="scoreBoard">
+        <div>High Score: <span>10000</span></div>
+        <div>Score: <span id="score">0</span></div>
+    </div>
+    <canvas id="gameCanvas" width="440" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        const tileSize = 20;
+        let score = 0;
+        let gameOver = false;
+        let gameWin = false;
+
+        // Configuração para o brilho neon global no Canvas
+        ctx.shadowColor = 'rgba(0, 0, 255, 0.5)';
+        ctx.shadowBlur = 5;
+
+        // 3. MAPA MAIS DETALHADO E PROFISSIONAL (Original-ish layout)
+        // 1=Parede, 0=Pastilha, 2=Vazio, 3=Pastilha de Poder (Blinking)
+        const map = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+            [1,3,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,3,1], // Pastilha de Poder (3)
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,0,1],
+            [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
+            [1,1,1,1,1,0,1,1,1,2,1,2,1,1,1,0,1,1,1,1,1],
+            [2,2,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,2,2],
+            [1,1,1,1,1,0,1,2,1,1,2,1,1,2,1,0,1,1,1,1,1],
+            [2,2,2,2,2,0,2,2,1,2,2,2,1,2,2,0,2,2,2,2,2], // Túnel
+            [1,1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1,1],
+            [2,2,2,2,1,0,1,2,2,2,2,2,2,2,1,0,1,2,2,2,2],
+            [1,1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+            [1,3,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,3,1], // Pastilha de Poder (3)
+            [1,1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1,1],
+            [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
+            [1,0,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        // 4. POLIMENTO VISUAL DO PAC-MAN
+        const pacman = {
+            x: 10 * tileSize + tileSize/2,
+            y: 16 * tileSize + tileSize/2,
+            radius: 8,
+            baseSpeed: 2,
+            speed: 2,
+            dx: 0, dy: 0,
+            angle: 0,
+            mouthOpen: 0,
+            mouthDir: 1,
+            powerUpTimer: 0 // Novo cronômetro para o modo "Caçador"
+        };
+
+        // 5. ESTADOS DOS FANTASMAS (Mecânica clássica)
+        // 5. ESTADOS DOS FANTASMAS (Mecânica clássica e Spawn corrigido)
+        const ghosts = [
+            // Blinky (Vermelho) começa do lado de fora, no centro (linha 8)
+            { x: 10 * tileSize + tileSize/2, y: 8 * tileSize + tileSize/2, color: 'rgb(255, 0, 0)',   id: 'blinky', dx: 2, dy: 0, scared: false, dead: false },
+            
+            // Pinky (Rosa) começa exatamente na porta (linha 9), forçado a subir (dy: -2)
+            { x: 10 * tileSize + tileSize/2, y: 9 * tileSize + tileSize/2, color: 'rgb(255, 182, 193)', id: 'pinky', dx: 0, dy: -2, scared: false, dead: false },
+            
+            // Inky (Ciano) começa do lado de fora, à esquerda
+            { x: 9 * tileSize + tileSize/2, y: 8 * tileSize + tileSize/2, color: 'rgb(0, 255, 255)',   id: 'inky',   dx: -2, dy: 0, scared: false, dead: false },
+            
+            // Clyde (Laranja) começa do lado de fora, à direita
+            { x: 11 * tileSize + tileSize/2, y: 8 * tileSize + tileSize/2, color: 'rgb(255, 165, 0)',   id: 'clyde',  dx: 2, dy: 0, scared: false, dead: false }
+        ];
+        // Lógica de frames para pastilhas piscantes
+        let frameCount = 0;
+
+        document.addEventListener('keydown', (e) => {
+            if (gameOver || gameWin) return;
+            if (e.key === 'ArrowLeft')  { pacman.dx = -pacman.speed; pacman.dy = 0; pacman.angle = Math.PI; }
+            if (e.key === 'ArrowRight') { pacman.dx = pacman.speed; pacman.dy = 0; pacman.angle = 0; }
+            if (e.key === 'ArrowUp')    { pacman.dx = 0; pacman.dy = -pacman.speed; pacman.angle = -Math.PI / 2; }
+            if (e.key === 'ArrowDown')  { pacman.dx = 0; pacman.dy = pacman.speed; pacman.angle = Math.PI / 2; }
+        });
+
+        function checkCollision(x, y, radius) {
+            let col1 = Math.floor((x - radius) / tileSize);
+            let col2 = Math.floor((x + radius) / tileSize);
+            let row1 = Math.floor((y - radius) / tileSize);
+            let row2 = Math.floor((y + radius) / tileSize);
+
+            if (col1 < 0 || col2 >= map[0].length) return false;
+
+            if (map[row1][col1] === 1 || map[row1][col2] === 1 || 
+                map[row2][col1] === 1 || map[row2][col2] === 1) {
+                return true;
+            }
+            return false;
+        }
+
+        // 6. DESENHO DO MAPA COM ESTILO NEON
+        function drawMap() {
+            frameCount++;
+            let powerPelletColor = 'white';
+            
+            // Lógica para fazer a pastilha de poder piscar
+            if (Math.floor(frameCount / 15) % 2 === 0) {
+                powerPelletColor = 'rgba(255, 255, 255, 0.2)'; // Fica quase invisível
+            }
+
+            for (let row = 0; row < map.length; row++) {
+                for (let col = 0; col < map[row].length; col++) {
+                    let tileX = col * tileSize;
+                    let tileY = row * tileSize;
+                    
+                    if (map[row][col] === 1) {
+                        // Paredes Neon Azul
+                        ctx.fillStyle = 'rgba(25, 25, 166, 0.2)'; // Fundo semi-transparente
+                        ctx.fillRect(tileX, tileY, tileSize, tileSize);
+                        
+                        ctx.strokeStyle = '#1919A6'; // Borda Neon
+                        ctx.lineWidth = 2;
+                        ctx.shadowColor = '#4df'; // Brilho neon ciano suave
+                        ctx.shadowBlur = 10;
+                        ctx.strokeRect(tileX + 2, tileY + 2, tileSize - 4, tileSize - 4);
+                        ctx.shadowBlur = 0; // Reseta brilho para o próximo
+                    } else if (map[row][col] === 0) {
+                        // Pastilhas Normais
+                        ctx.fillStyle = '#ffb8ae'; // Tom pêssego clássico
+                        ctx.beginPath();
+                        ctx.arc(tileX + tileSize/2, tileY + tileSize/2, 2.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (map[row][col] === 3) {
+                        // Pastilhas de Poder (Maiores e Piscantes)
+                        ctx.fillStyle = powerPelletColor;
+                        ctx.shadowColor = 'white';
+                        ctx.shadowBlur = 15;
+                        ctx.beginPath();
+                        ctx.arc(tileX + tileSize/2, tileY + tileSize/2, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+        }
+
+        function drawPacman() {
+            ctx.save();
+            ctx.translate(pacman.x, pacman.y);
+            ctx.rotate(pacman.angle);
+
+            pacman.mouthOpen += 0.08 * pacman.mouthDir;
+            if (pacman.mouthOpen >= 0.25 || pacman.mouthOpen <= 0) pacman.mouthDir *= -1;
+
+            ctx.fillStyle = 'yellow';
+            ctx.shadowColor = 'yellow';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            // Desenha o arco da boca aberta
+            ctx.arc(0, 0, pacman.radius, pacman.mouthOpen * Math.PI, (2 - pacman.mouthOpen) * Math.PI);
+            ctx.lineTo(0, 0); // Linha até o centro para fechar o "formato de torta"
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawGhosts() {
+            ghosts.forEach(ghost => {
+                if (ghost.dead) return; // Não desenha fantasmas comidos (apenas olhos, simplificado aqui)
+
+                // 7. POLIMENTO VISUAL DOS FANTASMAS E ESTADO SCARED
+                let ghostColor = ghost.color;
+                if (ghost.scared) {
+                    ghostColor = 'rgb(0, 0, 255)'; // Azul quando com medo
+                    // Se o tempo estiver acabando, faz piscar em branco/azul
+                    if (pacman.powerUpTimer < 180 && Math.floor(frameCount / 10) % 2 === 0) {
+                        ghostColor = 'white';
+                    }
+                }
+
+                ctx.fillStyle = ghostColor;
+                ctx.shadowColor = ghostColor;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                // Cabeça e corpo
+                ctx.arc(ghost.x, ghost.y, pacman.radius, Math.PI, 0);
+                
+                // Pés ondulados (detalhe profissional)
+                let feetY = ghost.y + pacman.radius;
+                ctx.lineTo(ghost.x + pacman.radius, feetY);
+                for (let i = 0; i < 3; i++) {
+                   let waveX = (ghost.x + pacman.radius) - ((i * 2 + 1) * (pacman.radius*2 / 6));
+                   ctx.lineTo(waveX, feetY + (Math.floor(frameCount / 10) % 2 === 0 ? 3 : -1));
+                }
+                ctx.lineTo(ghost.x - pacman.radius, feetY);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Olhos (mantidos simples mas com brilho)
+                ctx.fillStyle = ghost.scared ? 'white' : 'white';
+                ctx.beginPath();
+                ctx.arc(ghost.x - 3, ghost.y - 2, 3, 0, Math.PI * 2); 
+                ctx.arc(ghost.x + 3, ghost.y - 2, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = ghost.scared ? 'blue' : 'blue';
+                let lookX = ghost.dx === 0 ? 0 : (ghost.dx > 0 ? 1.5 : -1.5);
+                let lookY = ghost.dy === 0 ? 0 : (ghost.dy > 0 ? 1.5 : -1.5);
+                ctx.beginPath();
+                ctx.arc(ghost.x - 3 + lookX, ghost.y - 2 + lookY, 1.5, 0, Math.PI * 2); 
+                ctx.arc(ghost.x + 3 + lookX, ghost.y - 2 + lookY, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Função utilitária para verificar se o mapa está limpo
+        function checkWinCondition() {
+            for (let row = 0; row < map.length; row++) {
+                if (map[row].includes(0) || map[row].includes(3)) return false;
+            }
+            return true;
+        }
+
+        function update() {
+            if (gameOver || gameWin) return;
+
+            // Movimento Pac-Man
+            let nextX = pacman.x + pacman.dx;
+            let nextY = pacman.y + pacman.dy;
+
+            // Túnel Mágico Lateral
+            if (nextX < tileSize/2) nextX = canvas.width - tileSize/2;
+            if (nextX > canvas.width - tileSize/2) nextX = tileSize/2;
+
+            if (!checkCollision(nextX, nextY, pacman.radius)) {
+                pacman.x = nextX;
+                pacman.y = nextY;
+            }
+
+            // Cronômetro da Pastilha de Poder
+            if (pacman.powerUpTimer > 0) {
+                pacman.powerUpTimer--;
+                if (pacman.powerUpTimer === 0) {
+                    ghosts.forEach(g => { g.scared = false; g.speed = 1.5; });
+                    pacman.speed = pacman.baseSpeed;
+                }
+            }
+
+            // Comer pastilhas
+            let mapCol = Math.floor(pacman.x / tileSize);
+            let mapRow = Math.floor(pacman.y / tileSize);
+            if (map[mapRow] && map[mapRow][mapCol] === 0) {
+                map[mapRow][mapCol] = 2; 
+                score += 10;
+                scoreElement.innerText = score;
+                if (checkWinCondition()) gameWin = true;
+            } else if (map[mapRow] && map[mapRow][mapCol] === 3) {
+                // 8. LÓGICA DA PASTILHA DE PODER PROFISSIONAL
+                map[mapRow][mapCol] = 2;
+                score += 50;
+                scoreElement.innerText = score;
+                pacman.powerUpTimer = 600; // ~10 segundos a 60fps
+                
+                // Altera estado de todos os fantasmas
+                ghosts.forEach(ghost => {
+                    ghost.scared = true;
+                    // Inverte a direção imediatamente (mecânica clássica)
+                    ghost.dx *= -1;
+                    ghost.dy *= -1;
+                });
+                if (checkWinCondition()) gameWin = true;
+            }
+
+            // Movimento dos Fantasmas (Inteligência corrigida)
+            ghosts.forEach(ghost => {
+                if (ghost.dead) return;
+
+                let ghostSpeed = ghost.scared ? 1 : 2; // Fantasmas ficam lentos com medo
+                let gNextX = ghost.x + ghost.dx * (ghostSpeed/2);
+                let gNextY = ghost.y + ghost.dy * (ghostSpeed/2);
+
+                if (checkCollision(gNextX, gNextY, pacman.radius - 2)) {
+                    const directions = [
+                        {dx: 2, dy: 0}, {dx: -2, dy: 0}, 
+                        {dx: 0, dy: 2}, {dx: 0, dy: -2}
+                    ];
+                    
+                    const possibleMoves = directions.filter(dir => {
+                        return !checkCollision(ghost.x + dir.dx, ghost.y + dir.dy, pacman.radius - 2);
+                    });
+                    
+                    if (possibleMoves.length > 0) {
+                        let randomDir = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                        ghost.dx = randomDir.dx;
+                        ghost.dy = randomDir.dy;
+                    }
+                } else {
+                    ghost.x = gNextX;
+                    ghost.y = gNextY;
+                }
+
+                // Colisão Pac-Man vs Fantasma
+                let dist = Math.hypot(pacman.x - ghost.x, pacman.y - ghost.y);
+                if (dist < pacman.radius * 2) {
+                    if (ghost.scared) {
+                        // 9. MECÂNICA DE COMER FANTASMA
+                        ghost.scared = false;
+                        ghost.dead = true;
+                        score += 200;
+                        scoreElement.innerText = score;
+                        // Simplificação: Ressuscita o fantasma após 5 segundos
+                        setTimeout(() => {
+                            ghost.dead = false;
+                            ghost.x = 10 * tileSize + tileSize/2;
+                            ghost.y = 10 * tileSize + tileSize/2;
+                        }, 5000);
+                    } else if (!ghost.dead) {
+                        gameOver = true;
+                    }
+                }
+            });
+        }
+
+        // 10. INTERFACE DE FIM DE JOGO PROFISSIONAL
+        function drawEndScreen(text, color) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Fundo escurecido suave
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = color;
+            ctx.font = 'bold 50px Bungee';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20;
+            ctx.fillText(text, canvas.width/2, canvas.height/2);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Bungee';
+            ctx.shadowBlur = 5;
+            ctx.fillText('Press F5 to restart', canvas.width/2, canvas.height/2 + 40);
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawMap();
+            drawPacman();
+            drawGhosts();
+            update();
+
+            if (gameOver) {
+                drawEndScreen('GAME OVER', 'red');
+            } else if (gameWin) {
+                drawEndScreen('YOU WIN!', '#4df'); // Ciano neon
+            } else {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Inicia
+        gameLoop();
+    </script>
+</body>
+</html>
