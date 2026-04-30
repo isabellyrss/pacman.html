@@ -134,6 +134,10 @@
             }
 
             if (gameOver || gameWin) return;
+            
+            if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
             if (e.key === 'ArrowLeft')  pacman.requestedDir = DIRECTIONS.LEFT;
             if (e.key === 'ArrowRight') pacman.requestedDir = DIRECTIONS.RIGHT;
             if (e.key === 'ArrowUp')    pacman.requestedDir = DIRECTIONS.UP;
@@ -280,7 +284,10 @@
 
             ghosts.forEach(ghost => {
                 if (ghost.dead) return;
-                let ghostSpeed = ghost.scared ? 1 : 2; 
+                
+                // --- VELOCIDADE ALTERADA AQUI ---
+                let ghostSpeed = ghost.scared ? 0.5 : 1; 
+                
                 let gCol = Math.floor(ghost.x / tileSize);
                 let gRow = Math.floor(ghost.y / tileSize);
                 let gCenterX = gCol * tileSize + tileSize/2;
@@ -289,12 +296,19 @@
                 if (Math.abs(ghost.x - gCenterX) < 1 && Math.abs(ghost.y - gCenterY) < 1) {
                     ghost.x = gCenterX; ghost.y = gCenterY;
                     const dirs = [{dx: 2, dy: 0}, {dx: -2, dy: 0}, {dx: 0, dy: 2}, {dx: 0, dy: -2}];
-                    const possibleMoves = dirs.filter(dir => !isWallAt(gCol + (dir.dx/2), gRow + (dir.dy/2)));
+                    
+                    let possibleMoves = dirs.filter(dir => !isWallAt(gCol + (dir.dx/2), gRow + (dir.dy/2)));
+                    
+                    if (possibleMoves.length > 1) {
+                        possibleMoves = possibleMoves.filter(dir => !(dir.dx === -ghost.dx && dir.dy === -ghost.dy));
+                    }
+
                     if (possibleMoves.length > 0) {
                         let randomDir = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
                         ghost.dx = randomDir.dx; ghost.dy = randomDir.dy;
                     }
                 }
+                
                 ghost.x += ghost.dx * (ghostSpeed/2);
                 ghost.y += ghost.dy * (ghostSpeed/2);
                 if (ghost.x < 0) ghost.x = canvas.width;
